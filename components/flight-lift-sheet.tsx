@@ -2,17 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
-import { Check, MapPin } from "lucide-react";
+import { Check, MapPin, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
 import {
   type DublinArrival,
   formatDublinTime,
@@ -112,26 +105,47 @@ export function FlightLiftSheet({
     refreshList();
   };
 
-  if (!flight) return null;
+  if (!open || !flight) return null;
 
   const alreadyGoingHere = mine?.destinationId === destinationId;
   const canJoin = Boolean(destinationId);
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="bottom"
-        className="flex h-[92dvh] max-h-[92dvh] flex-col gap-0 overflow-hidden rounded-t-3xl p-0"
+    <div className="fixed inset-0 z-50">
+      <button
+        type="button"
+        className="absolute inset-0 bg-black/40"
+        aria-label="Close"
+        onClick={() => onOpenChange(false)}
+      />
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="ride-pool-title"
+        className="absolute inset-x-0 bottom-0 flex h-[92dvh] max-h-[92dvh] flex-col overflow-hidden rounded-t-3xl bg-background shadow-2xl"
       >
-        <SheetHeader className="shrink-0 gap-1 px-5 pb-3 pt-5 text-left">
-          <SheetTitle className="pr-10 text-xl font-semibold tracking-tight">
+        <header className="relative shrink-0 px-5 pb-3 pt-5">
+          <h2
+            id="ride-pool-title"
+            className="pr-12 text-xl font-semibold tracking-tight"
+          >
             Where are you going?
-          </SheetTitle>
-          <SheetDescription>
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
             {flight.flightIdentity} from {flight.originAirportName} ·{" "}
             {formatDublinTime(flight.scheduledDateTime)}
-          </SheetDescription>
-        </SheetHeader>
+          </p>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="absolute top-4 right-4"
+            onClick={() => onOpenChange(false)}
+            aria-label="Close"
+          >
+            <X className="size-4" />
+          </Button>
+        </header>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-4">
           <DestinationMap destination={selectedDestination} active={open} />
@@ -251,7 +265,7 @@ export function FlightLiftSheet({
             )}
           </Button>
         </div>
-      </SheetContent>
-    </Sheet>
+      </section>
+    </div>
   );
 }
