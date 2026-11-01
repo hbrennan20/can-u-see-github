@@ -1,16 +1,19 @@
-export type LiftIntent = "need-ride" | "share-uber" | "have-space";
+import { destinationById } from "@/lib/destinations";
 
 export type LiftCheckIn = {
   id: string;
   flightKey: string;
   name: string;
-  intent: LiftIntent;
-  destination: string;
-  note: string;
+  destinationId: string;
   createdAt: string;
 };
 
-const STORAGE_KEY = "dub-lift-pool-v1";
+export type FlightPoolSummary = {
+  count: number;
+  destinationIds: string[];
+};
+
+const STORAGE_KEY = "dub-lift-pool-v2";
 const PROFILE_KEY = "dub-lift-pool-profile-v1";
 
 export function flightPoolKey(date: string, internalFlightId: string) {
@@ -23,7 +26,9 @@ function readAll(): LiftCheckIn[] {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as LiftCheckIn[];
-    return Array.isArray(parsed) ? parsed : [];
+    return Array.isArray(parsed)
+      ? parsed.filter((entry) => entry?.flightKey && entry?.destinationId)
+      : [];
   } catch {
     return [];
   }
@@ -39,28 +44,54 @@ export function getCheckInsForFlight(flightKey: string): LiftCheckIn[] {
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
 
-export function countCheckInsForFlight(flightKey: string): number {
-  return getCheckInsForFlight(flightKey).length;
-}
+export function poolSummariesByFlightKey(): Record<string, FlightPoolSummary> {
+  const summaries: Record<string, FlightPoolSummary> = {};
 
-export function checkInCountsByFlightKey(): Record<string, number> {
-  const counts: Record<string, number> = {};
   for (const entry of readAll()) {
-    counts[entry.flightKey] = (counts[entry.flightKey] ?? 0) + 1;
+    const current = summaries[entry.flightKey] ?? {
+      count: 0,
+      destinationIds: [],
+    };
+    current.count += 1;
+    if (!current.destinationIds.includes(entry.destinationId)) {
+      current.destinationIds.push(entry.destinationId);
+    }
+    summaries[entry.flightKey] = current;
   }
-  return counts;
+
+  return summaries;
 }
 
-export function addCheckIn(
-  input: Omit<LiftCheckIn, "id" | "createdAt">,
-): LiftCheckIn {
+export function upsertCheckIn(input: {
+  flightKey: string;
+  name: string;
+  destinationId: string;
+}): LiftCheckIn {
+  const name = input.name.trim() || "You";
+  const existing = readAll();
+  const matchIndex = existing.findIndex(
+    (entry) => entry.flightKey === input.flightKey && entry.name === name,
+  );
+
+  if (matchIndex >= 0) {
+    const updated: LiftCheckIn = {
+      ...existing[matchIndex],
+      destinationId: input.destinationId,
+    };
+    const next = [...existing];
+    next[matchIndex] = updated;
+    writeAll(next);
+    return updated;
+  }
+
   const entry: LiftCheckIn = {
-    ...input,
     id: crypto.randomUUID(),
+    flightKey: input.flightKey,
+    name,
+    destinationId: input.destinationId,
     createdAt: new Date().toISOString(),
   };
-  const next = [...readAll(), entry];
-  writeAll(next);
+  writeAll([...existing, entry]);
   return entry;
 }
 
@@ -81,16 +112,12 @@ export function getSavedName(): string {
 }
 
 export function saveProfileName(name: string) {
-  window.localStorage.setItem(PROFILE_KEY, JSON.stringify({ name: name.trim() }));
+  window.localStorage.setItem(
+    PROFILE_KEY,
+    JSON.stringify({ name: name.trim() }),
+  );
 }
 
-export function intentLabel(intent: LiftIntent): string {
-  switch (intent) {
-    case "need-ride":
-      return "Need a lift";
-    case "share-uber":
-      return "Sharing an Uber";
-    case "have-space":
-      return "Have space in my car";
-  }
+export function destinationLabel(destinationId: string) {
+  return destinationById(destinationId)?.label ?? destinationId;
 }
