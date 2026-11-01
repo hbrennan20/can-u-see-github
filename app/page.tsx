@@ -16,6 +16,7 @@ export default async function Home() {
     <main className="min-h-screen bg-background">
       <ArrivalsBoard
         flights={flights}
+        date={date}
         dateLabel={formatDublinDateLabel(date)}
         lastUpdated={lastUpdated}
       />
