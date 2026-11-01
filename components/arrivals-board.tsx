@@ -1,13 +1,18 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { PlaneLanding, RefreshCw, Search } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { CarFront, PlaneLanding, RefreshCw, Search } from "lucide-react";
 
+import { FlightLiftSheet } from "@/components/flight-lift-sheet";
 import {
   type DublinArrival,
   formatDublinTime,
   statusVariant,
 } from "@/lib/arrivals";
+import {
+  checkInCountsByFlightKey,
+  flightPoolKey,
+} from "@/lib/lift-pool-storage";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,16 +21,44 @@ import { cn } from "@/lib/utils";
 
 type ArrivalsBoardProps = {
   flights: DublinArrival[];
+  date: string;
   dateLabel: string;
   lastUpdated?: string;
 };
 
 export function ArrivalsBoard({
   flights,
+  date,
   dateLabel,
   lastUpdated,
 }: ArrivalsBoardProps) {
   const [query, setQuery] = useState("");
+  const [selectedFlight, setSelectedFlight] = useState<DublinArrival | null>(
+    null,
+  );
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [poolCounts, setPoolCounts] = useState<Record<string, number>>({});
+
+  const refreshPoolCounts = useCallback(() => {
+    setPoolCounts(checkInCountsByFlightKey());
+  }, []);
+
+  useEffect(() => {
+    refreshPoolCounts();
+  }, [refreshPoolCounts]);
+
+  const handleSheetOpenChange = (open: boolean) => {
+    setSheetOpen(open);
+    if (!open) {
+      setSelectedFlight(null);
+      refreshPoolCounts();
+    }
+  };
+
+  const openFlight = (flight: DublinArrival) => {
+    setSelectedFlight(flight);
+    setSheetOpen(true);
+  };
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -110,9 +143,25 @@ export function ArrivalsBoard({
         </Card>
       ) : (
         <ul className="flex flex-col gap-3">
-          {filtered.map((flight) => (
+          {filtered.map((flight) => {
+            const poolKey = flightPoolKey(date, flight.internalFlightId);
+            const poolCount = poolCounts[poolKey] ?? 0;
+
+            return (
             <li key={flight.internalFlightId}>
-              <Card className="overflow-hidden py-0 shadow-sm">
+              <Card
+                className="cursor-pointer overflow-hidden py-0 shadow-sm transition-colors hover:bg-muted/30 active:bg-muted/50"
+                onClick={() => openFlight(flight)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    openFlight(flight);
+                  }
+                }}
+                role="button"
+                tabIndex={0}
+                aria-label={`${flight.flightIdentity} from ${flight.originAirportName}, open ride pool`}
+              >
                 <CardContent className="grid grid-cols-[4.5rem_1fr_auto] gap-3 px-4 py-3">
                   <div className="flex flex-col justify-center">
                     <p className="text-lg font-semibold tabular-nums leading-none">
@@ -144,6 +193,16 @@ export function ArrivalsBoard({
                           Belt {flight.baggageBelt}
                         </span>
                       ) : null}
+                      {poolCount > 0 ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary">
+                          <CarFront className="size-3" aria-hidden />
+                          {poolCount} in ride pool
+                        </span>
+                      ) : (
+                        <span className="rounded-full border border-dashed px-2 py-0.5">
+                          Tap to share a lift
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -161,12 +220,21 @@ export function ArrivalsBoard({
                 </CardContent>
               </Card>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
 
+      <FlightLiftSheet
+        flight={selectedFlight}
+        date={date}
+        open={sheetOpen}
+        onOpenChange={handleSheetOpenChange}
+      />
+
       <p className="text-center text-[11px] leading-relaxed text-muted-foreground">
-        Live data from Dublin Airport. Times shown in Europe/Dublin.
+        Live data from Dublin Airport. Times shown in Europe/Dublin. Ride pools
+        are saved on this device only.
       </p>
     </div>
   );
