@@ -14,7 +14,14 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Dublin Airport Arrivals",
-  description: "Mobile-friendly live arrivals board for Dublin Airport (DUB).",
+  description:
+    "Today’s Dublin Airport arrivals. Tap a flight and pick where you’re going to share a ride.",
+};
+
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover" as const,
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
