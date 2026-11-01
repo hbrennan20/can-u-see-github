@@ -1,6 +1,6 @@
-# can-u-see-github
+# Dublin Airport Arrivals
 
-Minimal Next.js app created by a Cursor cloud agent, hosted on GitHub and deployed to Vercel.
+Mobile-optimised Next.js app with shadcn/ui that lists **all Dublin Airport (DUB) arrivals for today**, using Dublin Airport’s public flight-listing API.
 
 ## Local development
 
@@ -15,4 +15,9 @@ Open [http://localhost:3847](http://localhost:3847).
 
 - Next.js (App Router)
 - TypeScript
-- Tailwind CSS
+- Tailwind CSS v4
+- shadcn/ui
+
+## Data
+
+Arrivals are loaded from `api.dublinairport.com` and paginated server-side for the current calendar day in `Europe/Dublin`. The page revalidates about every 60 seconds.
