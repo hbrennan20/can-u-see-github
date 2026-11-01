@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "GitHub + Vercel",
-  description: "Connected from Cursor cloud agent",
+  title: "Dublin Airport Arrivals",
+  description: "Mobile-friendly live arrivals board for Dublin Airport (DUB).",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
