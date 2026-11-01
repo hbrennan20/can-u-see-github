@@ -2,6 +2,8 @@
 
 Mobile-optimised Next.js app with shadcn/ui that lists **all Dublin Airport (DUB) arrivals for today**, using Dublin Airport’s public flight-listing API.
 
+Tap any arrival to open a **ride pool** sheet: one-tap check-in if you want to share an Uber, need a lift, or have space in your car. Check-ins are stored in **localStorage on this device** (handy to coordinate at the belt; sync across phones can come later).
+
 ## Local development
 
 ```bash
