@@ -1,22 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CarFront, PlaneLanding, RefreshCw, Search } from "lucide-react";
+import { ChevronRight, PlaneLanding, RefreshCw, Search } from "lucide-react";
 
 import { FlightLiftSheet } from "@/components/flight-lift-sheet";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   type DublinArrival,
   formatDublinTime,
-  statusVariant,
 } from "@/lib/arrivals";
+import { destinationById } from "@/lib/destinations";
 import {
-  checkInCountsByFlightKey,
   flightPoolKey,
+  type FlightPoolSummary,
+  poolSummariesByFlightKey,
 } from "@/lib/lift-pool-storage";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 type ArrivalsBoardProps = {
@@ -25,6 +24,30 @@ type ArrivalsBoardProps = {
   dateLabel: string;
   lastUpdated?: string;
 };
+
+function statusTone(statusMessage: string) {
+  const message = statusMessage.toUpperCase();
+  if (message.includes("CANCEL")) return "text-destructive";
+  if (message.includes("DELAY")) return "text-orange-600 dark:text-orange-400";
+  if (
+    message.includes("LANDED") ||
+    message.includes("ARRIVED") ||
+    message.includes("BAGGAGE")
+  ) {
+    return "text-teal-700 dark:text-teal-400";
+  }
+  return "text-muted-foreground";
+}
+
+function poolHint(summary?: FlightPoolSummary) {
+  if (!summary || summary.count === 0) return null;
+  const first = destinationById(summary.destinationIds[0])?.label;
+  if (!first) return `${summary.count} sharing a ride`;
+  if (summary.destinationIds.length === 1) {
+    return `${summary.count} to ${first}`;
+  }
+  return `${summary.count} sharing rides`;
+}
 
 export function ArrivalsBoard({
   flights,
@@ -37,21 +60,23 @@ export function ArrivalsBoard({
     null,
   );
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [poolCounts, setPoolCounts] = useState<Record<string, number>>({});
+  const [poolSummaries, setPoolSummaries] = useState<
+    Record<string, FlightPoolSummary>
+  >({});
 
-  const refreshPoolCounts = useCallback(() => {
-    setPoolCounts(checkInCountsByFlightKey());
+  const refreshPoolSummaries = useCallback(() => {
+    setPoolSummaries(poolSummariesByFlightKey());
   }, []);
 
   useEffect(() => {
-    refreshPoolCounts();
-  }, [refreshPoolCounts]);
+    refreshPoolSummaries();
+  }, [refreshPoolSummaries]);
 
   const handleSheetOpenChange = (open: boolean) => {
     setSheetOpen(open);
     if (!open) {
       setSelectedFlight(null);
-      refreshPoolCounts();
+      refreshPoolSummaries();
     }
   };
 
@@ -91,135 +116,111 @@ export function ArrivalsBoard({
     : null;
 
   return (
-    <div className="mx-auto flex w-full max-w-lg flex-col gap-4 px-4 pb-8 pt-4">
-      <header className="sticky top-0 z-10 -mx-4 border-b bg-background/95 px-4 pb-4 pt-2 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-        <div className="flex items-start justify-between gap-3">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 text-primary">
-              <PlaneLanding className="size-5" aria-hidden />
-              <p className="text-xs font-semibold uppercase tracking-[0.18em]">
+    <div className="mx-auto flex w-full max-w-lg flex-col px-4 pb-10 pt-3">
+      <header className="sticky top-0 z-10 -mx-4 border-b bg-background/90 px-4 pb-3 pt-[max(0.5rem,env(safe-area-inset-top))] backdrop-blur-xl">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 text-teal-700 dark:text-teal-400">
+              <PlaneLanding className="size-4" aria-hidden />
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em]">
                 Dublin Airport
               </p>
             </div>
-            <h1 className="text-2xl font-semibold tracking-tight">Arrivals</h1>
-            <p className="text-sm text-muted-foreground">{dateLabel}</p>
+            <h1 className="text-[1.75rem] font-semibold tracking-tight">
+              Arrivals
+            </h1>
+            <p className="truncate text-sm text-muted-foreground">{dateLabel}</p>
           </div>
           <Button
             type="button"
-            variant="outline"
+            variant="ghost"
             size="icon"
-            className="shrink-0"
+            className="size-11 shrink-0 rounded-full"
             onClick={() => window.location.reload()}
             aria-label="Refresh arrivals"
           >
-            <RefreshCw className="size-4" />
+            <RefreshCw className="size-5" />
           </Button>
         </div>
 
-        <div className="relative mt-4">
-          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+        <div className="relative mt-3">
+          <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search flight, airline, origin…"
-            className="pl-9"
+            placeholder="Flight or city"
+            className="h-12 rounded-2xl pl-10 text-base"
             aria-label="Search arrivals"
           />
         </div>
 
-        <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
-          <span>
-            {filtered.length} of {flights.length} flights
-          </span>
-          {updatedLabel ? <span>Updated {updatedLabel} (Dublin)</span> : null}
-        </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          {filtered.length} flights
+          {updatedLabel ? ` · ${updatedLabel}` : ""}
+        </p>
       </header>
 
       {filtered.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            No arrivals match your search.
-          </CardContent>
-        </Card>
+        <div className="mt-10 rounded-3xl bg-muted/70 px-6 py-12 text-center text-sm text-muted-foreground">
+          Nothing matches that search.
+        </div>
       ) : (
-        <ul className="flex flex-col gap-3">
+        <ul className="mt-4 flex flex-col gap-2.5">
           {filtered.map((flight) => {
             const poolKey = flightPoolKey(date, flight.internalFlightId);
-            const poolCount = poolCounts[poolKey] ?? 0;
+            const hint = poolHint(poolSummaries[poolKey]);
 
             return (
-            <li key={flight.internalFlightId}>
-              <Card
-                className="cursor-pointer overflow-hidden py-0 shadow-sm transition-colors hover:bg-muted/30 active:bg-muted/50"
-                onClick={() => openFlight(flight)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    openFlight(flight);
-                  }
-                }}
-                role="button"
-                tabIndex={0}
-                aria-label={`${flight.flightIdentity} from ${flight.originAirportName}, open ride pool`}
-              >
-                <CardContent className="grid grid-cols-[4.5rem_1fr_auto] gap-3 px-4 py-3">
-                  <div className="flex flex-col justify-center">
-                    <p className="text-lg font-semibold tabular-nums leading-none">
+              <li key={flight.internalFlightId}>
+                <button
+                  type="button"
+                  onClick={() => openFlight(flight)}
+                  className="flex w-full items-center gap-3 rounded-3xl bg-card px-4 py-3.5 text-left ring-1 ring-foreground/8 transition-colors active:bg-muted/60"
+                  aria-label={`${flight.flightIdentity} from ${flight.originAirportName}`}
+                >
+                  <div className="w-[4.25rem] shrink-0">
+                    <p className="text-[1.35rem] font-semibold tabular-nums leading-none tracking-tight">
                       {formatDublinTime(flight.scheduledDateTime)}
                     </p>
                     {flight.estimatedDateTime &&
                     flight.estimatedDateTime !== flight.scheduledDateTime ? (
                       <p className="mt-1 text-[11px] text-muted-foreground">
-                        Est. {formatDublinTime(flight.estimatedDateTime)}
+                        Est {formatDublinTime(flight.estimatedDateTime)}
                       </p>
                     ) : null}
                   </div>
 
-                  <div className="min-w-0">
-                    <p className="truncate text-base font-medium">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-base font-semibold">
                       {flight.originAirportName}
                     </p>
                     <p className="truncate text-sm text-muted-foreground">
-                      {flight.carrierName} · {flight.flightIdentity}
+                      {flight.flightIdentity}
+                      {flight.terminalName ? ` · ${flight.terminalName}` : ""}
                     </p>
-                    <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
-                      {flight.terminalName ? (
-                        <span className="rounded-full bg-muted px-2 py-0.5">
-                          {flight.terminalName}
-                        </span>
-                      ) : null}
-                      {flight.baggageBelt ? (
-                        <span className="rounded-full bg-muted px-2 py-0.5">
-                          Belt {flight.baggageBelt}
-                        </span>
-                      ) : null}
-                      {poolCount > 0 ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary">
-                          <CarFront className="size-3" aria-hidden />
-                          {poolCount} in ride pool
-                        </span>
-                      ) : (
-                        <span className="rounded-full border border-dashed px-2 py-0.5">
-                          Tap to share a lift
-                        </span>
-                      )}
-                    </div>
+                    {hint ? (
+                      <p className="mt-1 truncate text-xs font-medium text-teal-700 dark:text-teal-400">
+                        {hint}
+                      </p>
+                    ) : null}
                   </div>
 
-                  <div className="flex max-w-[7.5rem] items-start justify-end">
-                    <Badge
-                      variant={statusVariant(flight.statusMessage)}
+                  <div className="flex max-w-[5.5rem] shrink-0 flex-col items-end gap-2">
+                    <span
                       className={cn(
-                        "whitespace-normal text-right text-[10px] leading-tight",
-                        flight.isDelayed && "border-destructive/40",
+                        "text-right text-[11px] font-medium leading-tight",
+                        statusTone(flight.statusMessage),
                       )}
                     >
                       {flight.statusMessage}
-                    </Badge>
+                    </span>
+                    <ChevronRight
+                      className="size-4 text-muted-foreground/70"
+                      aria-hidden
+                    />
                   </div>
-                </CardContent>
-              </Card>
-            </li>
+                </button>
+              </li>
             );
           })}
         </ul>
@@ -231,11 +232,6 @@ export function ArrivalsBoard({
         open={sheetOpen}
         onOpenChange={handleSheetOpenChange}
       />
-
-      <p className="text-center text-[11px] leading-relaxed text-muted-foreground">
-        Live data from Dublin Airport. Times shown in Europe/Dublin. Ride pools
-        are saved on this device only.
-      </p>
     </div>
   );
 }
